@@ -78,7 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👋 **হ্যালো {user.first_name}!**\n\n"
         f"**Cyber Earn BD**-তে আপনাকে স্বাগতম!\n\n"
         f"🎯 **কীভাবে ইনকাম করবেন?**\n"
-        f"• Ads দেখে ইনকাম করুন (প্রতি এড ১০ পয়েন্ট)\n"
+        f"• Ads দেখে ইনকাম করুন (প্রতি এড 10 কয়েন)\n"
         f"• প্রতি রেফারে পান **{REFERRAL_BONUS} কয়েন**\n\n"
         f"👇 নিচের বাটনে ক্লিক করে কাজ শুরু করুন:"
     )
