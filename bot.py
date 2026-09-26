@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -20,7 +20,7 @@ BOT_TOKEN = "8845992911:AAFQ5-2n9E8-nzuJuffFAV9noljFz12A0cM"
 MINI_APP_URL = "https://cyberearnbd.netlify.app"
 REFERRAL_BONUS = 200  # 200 Coins
 
-# Simple In-Memory Database (Production-এ Database ব্যবহার করা ভালো)
+# Simple In-Memory Database
 user_balances = {}
 user_referrals = {}
 
@@ -66,9 +66,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = (await context.bot.get_me()).username
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
 
-    # Buttons layout
+    # Buttons layout (web_app ব্যবহার করা হয়েছে)
     keyboard = [
-        [InlineKeyboardButton("📱 Open App & Earn", url=f"{MINI_APP_URL}?user_id={user_id}")],
+        [InlineKeyboardButton("📱 Open App & Earn", web_app=WebAppInfo(url=f"{MINI_APP_URL}?user_id={user_id}"))],
         [InlineKeyboardButton("🔗 Share Referral Link", url=f"https://t.me/share/url?url={ref_link}&text=Join%20Cyber%20Earn%20BD%20and%20earn%20money!")],
         [InlineKeyboardButton("💰 Check Balance", callback_data="check_balance")]
     ]
