@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Earn BD Mini App</title>
+    <!-- Telegram & AdsGram SDKs -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0a0d14;
+            --card-bg: rgba(18, 26, 43, 0.75);
+            --primary-glow: #00f3ff;
+            --accent-green: #00ff88;
+            --accent-pink: #ff007f;
+            --text-color: #ffffff;
+        }
+
+        body {
+            font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 50% 50%, rgba(0, 243, 255, 0.08) 0%, rgba(255, 0, 127, 0.05) 50%, rgba(0,0,0,0) 80%);
+            z-index: -1;
+            animation: pulseLighting 8s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseLighting {
+            0% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+            100% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+        }
+
+        .top-header {
+            background: rgba(10, 13, 20, 0.85);
+            backdrop-filter: blur(15px);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 243, 255, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-glow), var(--accent-pink));
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .user-info .name {
+            font-size: 14px;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(255,255,255,0.5);
+        }
+
+        .balance-badge {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+        }
+
+        .water-card {
+            position: relative;
+            height: 140px;
+            border-radius: 20px;
+            background: #0d1626;
+            overflow: hidden;
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .water-wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, rgba(0, 243, 255, 0.3));
+            z-index: 1;
+        }
+
+        .water-wave::before, .water-wave::after {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -140%;
+            left: -50%;
+            background: rgba(10, 13, 20, 0.85);
+            border-radius: 40%;
+            animation: wave 9s infinite linear;
+        }
+
+        .water-wave::after {
+            border-radius: 35%;
+            background: rgba(13, 22, 38, 0.6);
+            animation: wave 6s infinite linear;
+        }
+
+        @keyframes wave {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .water-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+
+        .cyber-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-glow);
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+        }
+
+        .btn-glow {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+            box-shadow: 0 0 15px rgba(0, 198, 255, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-glow:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 25px rgba(0, 198, 255, 0.8);
+        }
+
+        .btn-glow:disabled {
+            background: #2a3547 !important;
+            box-shadow: none !important;
+            color: #6c7a89 !important;
+            cursor: not-allowed;
+        }
+
+        .cyber-input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            background: rgba(10, 13, 20, 0.8);
+            color: #fff;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .cyber-input:focus {
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+        }
+
+        .page-section {
+            display: none;
+            padding: 16px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 13, 20, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(0, 243, 255, 0.2);
+            box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #5c6b73;
+            text-decoration: none;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item i {
+            font-size: 20px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item.active {
+            color: var(--primary-glow);
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .nav-item.active i {
+            transform: translateY(-3px) scale(1.1);
+            color: var(--primary-glow);
+        }
+
+        .vpn-badge {
+            font-size: 13px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+        .vpn-ok { background: rgba(0, 255, 136, 0.15); color: #00ff88; border: 1px solid #00ff88; }
+        .vpn-fail { background: rgba(255, 0, 127, 0.15); color: #ff007f; border: 1px solid #ff007f; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="top-header">
+        <div class="user-profile">
+            <div class="user-avatar" id="avatar">U</div>
+            <div class="user-info">
+                <div class="name" id="user-fullname">ইউজার নেম</div>
+            </div>
+        </div>
+        <div class="balance-badge">
+            <i class="fa-solid fa-coins fa-bounce"></i>
+            <span id="header-balance">0</span> Coins
+        </div>
+    </div>
+
+    <!-- 1. HOME TAB -->
+    <div id="tab-home" class="page-section active">
+        <div class="water-card">
+            <div class="water-wave"></div>
+            <div class="water-content">
+                <div style="font-size: 12px; color: #8a99ad; text-transform: uppercase;"><i class="fa-solid fa-wallet"></i> মোট ব্যালেন্স</div>
+                <div style="font-size: 36px; font-weight: bold; color: #fff; text-shadow: 0 0 15px var(--primary-glow);">
+                    <span id="home-balance">0</span> <small style="font-size: 16px;">Coins</small>
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--primary-glow);">(১,০০০০ Coins = ১০০ টাকা)</p>
+            </div>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-brands fa-telegram fa-beat"></i> অফিশিয়াল চ্যানেল</div>
+            <p style="font-size: 13px; color: #b0bec5;">পেমেন্ট প্রুফ ও সকল আপডেট পেতে জয়েন করুন।</p>
+            <a href="https://t.me/CyberEarnBD_Official" target="_blank" style="text-decoration: none;">
+                <button class="btn-glow"><i class="fa-brands fa-telegram"></i> চ্যানেলে জয়েন করুন</button>
+            </a>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-gift fa-spin"></i> রেফারাল প্রোগ্রাম</div>
+            <p style="font-size: 13px; color: #b0bec5;">প্রতি রেফারে পাবেন নিশ্চিত <b>২০০ Coins (২ টাকা)</b> বোনাস!</p>
+            <input type="text" id="ref-link" class="cyber-input" value="https://t.me/CyberEarnBD_bot?start=12345" readonly>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn-glow" style="background: linear-gradient(135deg, #11998e, #38ef7d); flex: 1;" onclick="copyRefLink()">
+                    <i class="fa-solid fa-copy"></i> লিংক কপি করুন
+                </button>
+                <button class="btn-glow" style="background: linear-gradient(135deg, #00c6ff, #0072ff); flex: 1;" onclick="shareRefLink()">
+                    <i class="fa-solid fa-paper-plane"></i> লিংক শেয়ার করুন
+                </button>
+            </div>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-sitemap"></i> রেফারেল পদ্ধতি কীভাবে কাজ করে?</div>
+            <ul style="font-size: 13px; color: #b0bec5; padding-left: 20px; line-height: 1.8; margin: 0;">
+                <li>উপরের <b>লিংক কপি করুন</b> বা <b>শেয়ার করুন</b> বাটনে ক্লিক করে ইউনিক লিংকটি বন্ধুদের কাছে পাঠান।</li>
+                <li>আপনার শেয়ার করা রেফার লিংক ব্যবহার করে নতুন কোনো ইউজার বোটে জয়েন করলে সাথে সাথে আপনার অ্যাকাউন্টে <b>২০০ Coins (২ টাকা)</b> যোগ হবে।</li>
+                <li>রেফার সফল হলে আপনাকে টেলিগ্রাম বোটে তাৎক্ষণিক নোটিফিকেশন দেওয়া হবে।</li>
+                <li>যত বেশি বন্ধুকে জয়েন করাবেন, তত বেশি বোনাস আয় করতে পারবেন!</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 2. EARN TAB -->
+    <div id="tab-earn" class="page-section">
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-circle-play fa-beat-fade"></i> এডস ওয়াচ সেন্টার</div>
+            <p style="font-size: 13px; color: #b0bec5;">প্রতি বিজ্ঞাপনে নিশ্চিত ইনকাম: <b>১০ Coins (১০ পয়সা)</b></p>
+            
+            <div id="vpn-status" class="vpn-badge vpn-fail">
+                <i class="fa-solid fa-spinner fa-spin"></i> লোকেশন ভেরিফাই করা হচ্ছে...
+            </div>
+
+            <button id="ad-btn" class="btn-glow" onclick="watchAd()" disabled>
+                <i class="fa-solid fa-tv"></i> বিজ্ঞাপন দেখুন (+১০ Coins)
+            </button>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-file-contract"></i> কাজ করার শর্ত ও নিয়মাবলী</div>
+            <ul style="font-size: 13px; color: #b0bec5; padding-left: 20px; line-height: 1.8; margin: 0;">
+                <li>বিজ্ঞাপন দেখার সময় অবশ্যই <b>US</b> বা <b>UK</b> লোকেশনের VPN ব্যবহার করতে হবে।</li>
+                <li>প্রতিটি বিজ্ঞাপন সম্পূর্ণ সময় ধরে মনোযোগ সহকারে দেখতে হবে, মাঝপথে কেটে দিলে কয়েন যোগ হবে না।</li>
+                <li>কোনো প্রকার অটো-ক্লিকার (Auto-Clicker) বা স্ক্রিপ্ট ব্যবহার করা সম্পূর্ণ নিষিদ্ধ।</li>
+                <li>একই ডিভাইস বা আইপি থেকে ভুয়া রেফার বা একাধিক অ্যাকাউন্ট ব্যবহার করলে অ্যাকাউন্ট চিরতরে ব্যান হতে পারে।</li>
+                <li>নিয়ম মেনে কাজ করলে নিশ্চিত ১০০% পেমেন্ট পাবেন।</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 3. SUPPORT TAB -->
+    <div id="tab-support" class="page-section">
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-users fa-bounce"></i> সাপোর্ট ও কমিউনিটি গ্রুপ</div>
+            <p style="font-size: 13px; color: #b0bec5;">যেকোনো সমস্যা, সাহায্য বা আলোচনার জন্য আমাদের অফিশিয়াল কমিউনিটি গ্রুপে যুক্ত হয়ে মেসেজ দিন।</p>
+            <a href="https://t.me/CyberEarnBD_Community" target="_blank" style="text-decoration: none;">
+                <button class="btn-glow"><i class="fa-brands fa-telegram"></i> সাপোর্ট গ্রুপে জয়েন করুন</button>
+            </a>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-bullhorn fa-beat"></i> অফিশিয়াল চ্যানেল</div>
+            <p style="font-size: 13px; color: #b0bec5;">সকল নতুন আপডেট, পেমেন্ট প্রুফ ও ইভেন্টের খবর পেতে অফিশিয়াল চ্যানেলে যুক্ত থাকুন।</p>
+            <a href="https://t.me/CyberEarnBD_Official" target="_blank" style="text-decoration: none;">
+                <button class="btn-glow" style="background: linear-gradient(135deg, #11998e, #38ef7d);"><i class="fa-brands fa-telegram"></i> চ্যানেলে জয়েন করুন</button>
+            </a>
+        </div>
+    </div>
+
+    <!-- 4. WITHDRAW TAB -->
+    <div id="tab-withdraw" class="page-section">
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-money-bill-transfer"></i> টাকা ক্যাশ-আউট</div>
+            <p style="font-size: 12px; color: #8a99ad;">সর্বনিম্ন উইথড্র: <b>১,০০০০ Coins (১০০ টাকা)</b></p>
+            
+            <label style="font-size: 13px; color: var(--primary-glow);">মেথড:</label>
+            <select class="cyber-input">
+                <option>bKash Personal</option>
+                <option>Nagad Personal</option>
+            </select>
+
+            <label style="font-size: 13px; color: var(--primary-glow); margin-top: 10px; display: block;">মোবাইল নম্বর:</label>
+            <input type="text" class="cyber-input" placeholder="017XXXXXXXX">
+
+            <button class="btn-glow" style="margin-top: 15px;" onclick="requestWithdraw()">
+                <i class="fa-solid fa-paper-plane"></i> উইথড্র রিকোয়েস্ট পাঠান
+            </button>
+        </div>
+
+        <div class="cyber-card">
+            <div class="card-title"><i class="fa-solid fa-arrows-rotate fa-spin"></i> কয়েন ট্রান্সফার</div>
+            <input type="number" id="target-id" class="cyber-input" placeholder="প্রাপকের Telegram ID">
+            <input type="number" id="transfer-amount" class="cyber-input" placeholder="কয়েনের পরিমাণ">
+            <button class="btn-glow" style="background: linear-gradient(135deg, #11998e, #38ef7d); margin-top: 10px;" onclick="transferCoins()">
+                <i class="fa-solid fa-share-nodes"></i> কয়েন পাঠান
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. PROFILE TAB -->
+    <div id="tab-profile" class="page-section">
+        <div class="cyber-card" style="text-align: center;">
+            <div class="user-avatar" id="profile-avatar" style="width: 65px; height: 65px; font-size: 26px; margin: 0 auto 10px auto;">U</div>
+            <h3 id="profile-name" style="margin: 5px 0; font-size: 18px;">ইউজার নাম</h3>
+            <p style="font-size: 12px; color: #8a99ad;">Telegram ID: <span id="profile-id">12345678</span></p>
+        </div>
+
+        <div class="cyber-card">
+            <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px;">
+                <span>মোট কয়েন:</span>
+                <b><span id="profile-bal">0</span> Coins</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                <span>সমপরিমাণ টাকা:</span>
+                <b style="color: var(--accent-green);"><span id="profile-tk">0.00</span> ৳</b>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('tab-home', this)"><i class="fa-solid fa-house"></i>হোম</div>
+        <div class="nav-item" onclick="switchTab('tab-earn', this)"><i class="fa-solid fa-coins"></i>আয় করুন</div>
+        <div class="nav-item" onclick="switchTab('tab-support', this)"><i class="fa-solid fa-headset"></i>সাপোর্ট</div>
+        <div class="nav-item" onclick="switchTab('tab-withdraw', this)"><i class="fa-solid fa-wallet"></i>উইথড্র</div>
+        <div class="nav-item" onclick="switchTab('tab-profile', this)"><i class="fa-solid fa-user"></i>প্রোফাইল</div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let userBalance = 0; 
+        let isVPNValid = false;
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const u = tg.initDataUnsafe.user;
+            document.getElementById('user-fullname').innerText = u.first_name;
+            document.getElementById('profile-name').innerText = u.first_name;
+            document.getElementById('profile-id').innerText = u.id;
+            document.getElementById('avatar').innerText = u.first_name.charAt(0);
+            document.getElementById('profile-avatar').innerText = u.first_name.charAt(0);
+            
+            document.getElementById('ref-link').value = `https://t.me/CyberEarnBD_bot?start=${u.id}`;
+        }
+
+        function switchTab(tabId, el) {
+            document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            el.classList.add('active');
+        }
+
+        async function checkVPN() {
+            const statusBox = document.getElementById('vpn-status');
+            const adBtn = document.getElementById('ad-btn');
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                
+                if (data.country_code === 'US' || data.country_code === 'GB') {
+                    isVPNValid = true;
+                    statusBox.className = "vpn-badge vpn-ok";
+                    statusBox.innerHTML = '<i class="fa-solid fa-shield-check"></i> Connected: ' + data.country_code + ' (High CPM Active)';
+                    adBtn.disabled = false;
+                } else {
+                    isVPNValid = false;
+                    statusBox.className = "vpn-badge vpn-fail";
+                    statusBox.innerHTML = '<i class="fa-solid fa-lock"></i> শুধুমাত্র US বা UK VPN কানেক্ট করে কাজ করতে পারবেন';
+                    adBtn.disabled = true;
+                }
+            } catch (err) {
+                statusBox.innerText = "নেটওয়ার্ক চেকিং ব্যর্থ হয়েছে!";
+            }
+        }
+        checkVPN();
+
+        const AdController = window.Adsgram.init({ blockId: "50072" });
+
+        function watchAd() {
+            if (!isVPNValid) {
+                alert("দয়া করে US/UK VPN অন করুন!");
+                return;
+            }
+
+            AdController.show().then((result) => {
+                userBalance += 10;
+                updateBalanceUI();
+                alert("অভিনন্দন! ১০টি কয়েন যোগ হয়েছে।");
+            }).catch((err) => {
+                alert("বিজ্ঞাপন সম্পূর্ণ না দেখলে কয়েন যোগ হবে না!");
+            });
+        }
+
+        function updateBalanceUI() {
+            document.getElementById('header-balance').innerText = userBalance;
+            document.getElementById('home-balance').innerText = userBalance;
+            document.getElementById('profile-bal').innerText = userBalance;
+            document.getElementById('profile-tk').innerText = (userBalance / 100).toFixed(2);
+        }
+
+        function copyRefLink() {
+            const copyText = document.getElementById("ref-link");
+            copyText.select();
+            document.execCommand("copy");
+            alert("রেফারেল লিংক কপি করা হয়েছে!");
+        }
+
+        function shareRefLink() {
+            const refUrl = document.getElementById("ref-link").value;
+            const shareText = `🚀 Cyber Earn BD বোটে যুক্ত হয়ে প্রতিদিন বিজ্ঞাপন দেখে টাকা আয় করুন!\n\nপ্রতি রেফারে পাচ্ছেন ২০০ Coins (২ টাকা) বোনাস! এখনই কাজ শুরু করতে নিচের লিংকে ক্লিক করুন 👇\n${refUrl}`;
+            
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(refUrl)}&text=${encodeURIComponent(shareText)}`, '_blank');
+        }
+
+        function requestWithdraw() {
+            if (userBalance < 10000) {
+                alert("সর্বনিম্ন ১,০০০০ কয়েন (১০০ টাকা) ব্যালেন্স প্রয়োজন!");
+                return;
+            }
+            alert("উইথড্র রিকোয়েস্ট জমা নেওয়া হয়েছে!");
+        }
+
+        function transferCoins() {
+            const target = document.getElementById('target-id').value;
+            const amount = parseInt(document.getElementById('transfer-amount').value);
+
+            if (!target || !amount || amount <= 0) {
+                alert("সঠিক তথ্য দিন!");
+                return;
+            }
+
+            if (amount > userBalance) {
+                alert("পর্যাপ্ত কয়েন ব্যালেন্স নেই!");
+                return;
+            }
+
+            userBalance -= amount;
+            updateBalanceUI();
+            alert(target + " আইডিতে " + amount + " টি কয়েন পাঠানো হয়েছে!");
+        }
+    </script>
+</body>
+</html>
