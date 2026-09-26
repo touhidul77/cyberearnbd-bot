@@ -1,0 +1,4 @@
+fastapi0.110.0
+uvicorn0.28.0
+requests2.31.0
+pydantic2.6.4
