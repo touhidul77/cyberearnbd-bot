@@ -1,6 +1,6 @@
 """
 Cyber Earn BD - Telegram Bot & WebApp Backend API (FastAPI)
-Updated with proper Uvicorn startup entry and database handlers.
+Updated with automatic Telegram Webhook registration on startup.
 """
 
 import os
@@ -13,6 +13,8 @@ from pydantic import BaseModel
 import requests
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8845992911:AAFQ5-2n9E8-nzuJuffFAV9noljFz12A0cM")
+# আপনার রেন্ডার সার্ভারের সঠিক ইউআরএল এখানে বসানো হয়েছে
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://cyberearnbd-bot.onrender.com")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://cyberearnbd.netlify.app/")
 CHANNEL_URL = "https://t.me/CyberEarnBD_Official"
 GROUP_URL = "https://t.me/CyberEarnBD_Community"
@@ -30,35 +32,50 @@ app.add_middleware(
 DB_PATH = "cyber_earn.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id TEXT PRIMARY KEY,
-            first_name TEXT,
-            username TEXT,
-            coins INTEGER DEFAULT 0,
-            ads_watched INTEGER DEFAULT 0,
-            referrals_count INTEGER DEFAULT 0,
-            referred_by TEXT,
-            has_withdrawn_before INTEGER DEFAULT 0
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS withdrawals (
-            id TEXT PRIMARY KEY,
-            user_id TEXT,
-            method TEXT,
-            account_no TEXT,
-            amount_bdt REAL,
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                first_name TEXT,
+                username TEXT,
+                coins INTEGER DEFAULT 0,
+                ads_watched INTEGER DEFAULT 0,
+                referrals_count INTEGER DEFAULT 0,
+                referred_by TEXT,
+                has_withdrawn_before INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                method TEXT,
+                account_no TEXT,
+                amount_bdt REAL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Database Initialization Error:", str(e))
 
 init_db()
+
+# Startup event to register Telegram Webhook automatically
+@app.on_event("startup")
+def set_telegram_webhook():
+    if RENDER_EXTERNAL_URL:
+        webhook_url = f"{RENDER_EXTERNAL_URL}/webhook/{BOT_TOKEN}"
+        tg_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
+        try:
+            res = requests.get(tg_api)
+            print("Webhook Setup Response:", res.json())
+        except Exception as e:
+            print("Webhook Setup Failed:", str(e))
 
 class UserDataSync(BaseModel):
     user_id: str
@@ -76,7 +93,7 @@ class WithdrawRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "app": "Cyber Earn BD Backend Service", "version": "2.0"}
+    return {"status": "online", "app": "Cyber Earn BD Backend Service", "version": "2.1"}
 
 @app.post("/api/user/sync")
 def sync_user(data: UserDataSync):
@@ -91,7 +108,6 @@ def sync_user(data: UserDataSync):
             (data.user_id, data.first_name, data.username, data.referred_by)
         )
         
-        # Reward referrer (+200 coins) on first join via referral link
         if data.referred_by and data.referred_by != data.user_id:
             cursor.execute(
                 "UPDATE users SET coins = coins + 200, referrals_count = referrals_count + 1 WHERE user_id = ?",
@@ -99,7 +115,6 @@ def sync_user(data: UserDataSync):
             )
         conn.commit()
     else:
-        # Update user progress if provided
         if data.coins is not None and data.ads_watched is not None:
             cursor.execute(
                 "UPDATE users SET coins = ?, ads_watched = ? WHERE user_id = ?",
@@ -156,3 +171,8 @@ async def telegram_webhook(request: Request):
         print("Webhook Error:", str(e))
 
     return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
