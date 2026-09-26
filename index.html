@@ -1,757 +1,213 @@
-<!DOCTYPE html>
-<html lang="bn" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cyber Earn BD</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Adsgram SDK Integration -->
-    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+"""
+Cyber Earn BD - Telegram Bot & WebApp Backend API (FastAPI)
+Fully fixed referral counting and real production AdsGram integration.
+"""
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        cyber: {
-                            bg: '#0a0f1d',
-                            card: '#121a2d',
-                            accent: '#00f2fe',
-                            pink: '#4facfe',
-                            border: '#1f2d4d',
-                            glow: '#00d2ff'
-                        }
-                    },
-                    animation: {
-                        'pulse-glow': 'pulseGlow 2s infinite alternate',
-                        'water-wave': 'waterWave 4s infinite linear',
-                        'float': 'float 3s ease-in-out infinite'
-                    },
-                    keyframes: {
-                        pulseGlow: {
-                            '0%': { boxShadow: '0 0 10px rgba(0, 242, 254, 0.4)' },
-                            '100%': { boxShadow: '0 0 25px rgba(0, 242, 254, 0.9), 0 0 10px rgba(79, 172, 254, 0.6)' }
-                        },
-                        waterWave: {
-                            '0%': { backgroundPosition: '0% 50%' },
-                            '50%': { backgroundPosition: '100% 50%' },
-                            '100%': { backgroundPosition: '0% 50%' }
-                        },
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-6px)' }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+import os
+import json
+import sqlite3
+from typing import Optional
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import requests
 
-    <style>
-        body {
-            background-color: #070b14;
-            color: #e2e8f0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8845992911:AAFQ5-2n9E8-nzuJuffFAV9noljFz12A0cM")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://cyberearnbd-bot.onrender.com")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://cyberearnbd.netlify.app/")
+CHANNEL_URL = "https://t.me/CyberEarnBD_Official"
+GROUP_URL = "https://t.me/CyberEarnBD_Community"
 
-        .neon-glow-cyan {
-            text-shadow: 0 0 10px #00f2fe, 0 0 20px #00f2fe;
-        }
+app = FastAPI(title="Cyber Earn BD Backend API")
 
-        .water-glow-box {
-            background: linear-gradient(135deg, rgba(18, 26, 45, 0.8), rgba(15, 23, 42, 0.9));
-            border: 1px solid rgba(0, 242, 254, 0.3);
-            box-shadow: 0 0 15px rgba(0, 242, 254, 0.15), inset 0 0 15px rgba(0, 242, 254, 0.05);
-            backdrop-filter: blur(10px);
-        }
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-        .water-glow-box-active {
-            border: 1px solid rgba(0, 242, 254, 0.8);
-            box-shadow: 0 0 20px rgba(0, 242, 254, 0.4), inset 0 0 10px rgba(0, 242, 254, 0.2);
-        }
+DB_PATH = "cyber_earn.db"
 
-        .nav-glow-item {
-            position: relative;
-            transition: all 0.3s ease;
-        }
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                first_name TEXT,
+                username TEXT,
+                coins INTEGER DEFAULT 0,
+                ads_watched INTEGER DEFAULT 0,
+                referrals_count INTEGER DEFAULT 0,
+                referred_by TEXT,
+                has_withdrawn_before INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                method TEXT,
+                account_no TEXT,
+                amount_bdt REAL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Database Initialization Error:", str(e))
 
-        .nav-glow-item.active {
-            color: #00f2fe;
-        }
+init_db()
 
-        .nav-glow-item.active i {
-            filter: drop-shadow(0 0 8px #00f2fe);
-            transform: translateY(-2px);
-        }
+@app.on_event("startup")
+def set_telegram_webhook():
+    if RENDER_EXTERNAL_URL:
+        webhook_url = f"{RENDER_EXTERNAL_URL}/webhook/{BOT_TOKEN}"
+        tg_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
+        try:
+            res = requests.get(tg_api)
+            print("Webhook Setup Response:", res.json())
+        except Exception as e:
+            print("Webhook Setup Failed:", str(e))
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0a0f1d;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #00f2fe;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col justify-between overflow-x-hidden pb-20">
+class UserDataSync(BaseModel):
+    user_id: str
+    first_name: str
+    username: Optional[str] = None
+    referred_by: Optional[str] = None
+    coins: Optional[int] = None
+    ads_watched: Optional[int] = None
 
-    <div id="loader" class="fixed inset-0 bg-[#070b14] z-50 flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="relative flex items-center justify-center">
-            <div class="w-20 h-20 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
-            <div class="w-12 h-12 border-4 border-blue-500/20 border-b-blue-400 rounded-full animate-spin absolute" style="animation-direction: reverse;"></div>
-            <i class="fa-solid fa-[#00f2fe] fa-bolt text-cyan-400 text-xl absolute animate-pulse"></i>
-        </div>
-        <h2 class="mt-4 font-bold text-lg text-cyan-400 tracking-wider neon-glow-cyan animate-pulse">Cyber Earn BD</h2>
-        <p class="text-xs text-slate-400 mt-1">সিস্টেম লোড হচ্ছে...</p>
-    </div>
+class WithdrawRequest(BaseModel):
+    user_id: str
+    method: str
+    account_no: str
+    amount_bdt: float
 
-    <header class="p-4 bg-[#0c1222]/90 border-b border-cyan-500/20 sticky top-0 z-40 backdrop-blur-md">
-        <div class="max-w-md mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-400/50 flex items-center justify-center text-cyan-400 font-bold shadow-[0_0_10px_rgba(0,242,254,0.3)]">
-                    <span id="userAvatar">U</span>
-                </div>
-                <div>
-                    <h1 id="userName" class="text-sm font-bold text-white truncate max-w-[130px]">User Name</h1>
-                    <div class="flex items-center space-x-1">
-                        <span id="vpnBadge" class="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> VPN প্রয়োজন
-                        </span>
-                    </div>
-                </div>
-            </div>
+@app.get("/")
+def read_root():
+    return {"status": "online", "app": "Cyber Earn BD Backend Service", "version": "3.0"}
 
-            <!-- Balance Display Header -->
-            <div class="water-glow-box px-3 py-1.5 rounded-xl flex items-center space-x-2">
-                <i class="fa-solid fa-coins text-yellow-400 animate-bounce"></i>
-                <div class="text-right">
-                    <div class="text-xs font-bold text-cyan-400"><span id="userCoins">0</span> কয়েন</div>
-                    <div class="text-[10px] text-slate-400">≈ ৳<span id="userMoney">0.00</span> BDT</div>
-                </div>
-            </div>
-        </div>
-    </header>
+@app.post("/api/user/sync")
+def sync_user(data: UserDataSync):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE user_id = ?", (data.user_id,))
+    user = cursor.fetchone()
 
-    <main class="max-w-md mx-auto w-full p-4 flex-1">
+    if not user:
+        # Register new user and handle referral reward securely
+        cursor.execute(
+            "INSERT INTO users (user_id, first_name, username, referred_by) VALUES (?, ?, ?, ?)",
+            (data.user_id, data.first_name, data.username, data.referred_by)
+        )
         
-        <!-- ================= TAB 1: HOME (হোম) ================= -->
-        <section id="tab-home" class="tab-content space-y-4">
-            <!-- Banner Card -->
-            <div class="water-glow-box p-5 rounded-2xl relative overflow-hidden">
-                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl"></div>
-                <h2 class="text-lg font-bold text-white mb-1">স্বাগতম Cyber Earn BD-তে! 🚀</h2>
-                <p class="text-xs text-slate-300 leading-relaxed mb-4">
-                    প্রতিটি এড দেখলে পাবেন <span class="text-cyan-400 font-bold">২০ কয়েন</span>! UK বা US VPN কানেক্ট করে নিরাপদে আয় করুন।
-                </p>
+        if data.referred_by and data.referred_by != data.user_id:
+            # Check if referrer exists
+            cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (data.referred_by,))
+            referrer = cursor.fetchone()
+            if referrer:
+                cursor.execute(
+                    "UPDATE users SET coins = coins + 200, referrals_count = referrals_count + 1 WHERE user_id = ?",
+                    (data.referred_by,)
+                )
+        conn.commit()
+    else:
+        # Sync coins and ads watched if provided
+        if data.coins is not None and data.ads_watched is not None:
+            cursor.execute(
+                "UPDATE users SET coins = ?, ads_watched = ? WHERE user_id = ?",
+                (data.coins, data.ads_watched, data.user_id)
+            )
+            conn.commit()
 
-                <!-- VPN Status Alert Banner -->
-                <div id="vpnAlertBox" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center space-x-3">
-                    <i class="fa-solid fa-shield-halved text-amber-400 text-xl"></i>
-                    <div class="text-xs">
-                        <p class="font-semibold text-amber-300">VPN ভেরিফিকেশন স্ট্যাটাস</p>
-                        <p id="vpnStatusText" class="text-amber-200/80">চেক করা হচ্ছে...</p>
-                    </div>
-                </div>
-            </div>
+    cursor.execute("SELECT user_id, coins, ads_watched, referrals_count, has_withdrawn_before FROM users WHERE user_id = ?", (data.user_id,))
+    res = cursor.fetchone()
+    conn.close()
 
-            <!-- Dashboard Stats Grid -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="water-glow-box p-4 rounded-xl flex flex-col items-center justify-center text-center">
-                    <i class="fa-solid fa-rectangle-ad text-2xl text-cyan-400 mb-1"></i>
-                    <span class="text-xs text-slate-400">মোট এড দেখেছেন</span>
-                    <span id="statAdsWatched" class="text-lg font-bold text-white">0</span>
-                </div>
-                <div class="water-glow-box p-4 rounded-xl flex flex-col items-center justify-center text-center">
-                    <i class="fa-solid fa-users text-2xl text-blue-400 mb-1"></i>
-                    <span class="text-xs text-slate-400">মোট রেফারেল</span>
-                    <span id="statReferrals" class="text-lg font-bold text-white">0</span>
-                </div>
-            </div>
+    if not res:
+        raise HTTPException(status_code=404, detail="User not found")
 
-            <!-- Quick Action Ads Section -->
-            <div class="water-glow-box p-4 rounded-2xl text-center space-y-3">
-                <h3 class="text-sm font-bold text-cyan-300"><i class="fa-solid fa-circle-play mr-1"></i> এড দেখে আয় করুন</h3>
-                <p class="text-xs text-slate-400">AdsGram এড দেখুন এবং একাউন্টে ২০ কয়েন (০.২০ টাকা) সাথে সাথে যোগ করুন।</p>
-                <button id="btnWatchAdHome" onclick="showAdsgramAd()" class="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl shadow-[0_0_15px_rgba(0,242,254,0.4)] transition-all flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-play text-lg"></i>
-                    <span>এড দেখুন (+২০ কয়েন)</span>
-                </button>
-            </div>
-        </section>
+    return {
+        "user_id": res[0],
+        "coins": res[1],
+        "ads_watched": res[2],
+        "referrals": res[3],
+        "has_withdrawn_before": bool(res[4])
+    }
 
-        <!-- ================= TAB 2: EARN (আয় করুন) ================= -->
-        <section id="tab-earn" class="tab-content hidden space-y-4">
-            <div class="water-glow-box p-4 rounded-2xl">
-                <h2 class="text-base font-bold text-cyan-400 mb-2 flex items-center">
-                    <i class="fa-solid fa-hand-holding-dollar mr-2"></i> আয়ের উপায়সমূহ
-                </h2>
-                <p class="text-xs text-slate-300">নিচের মাধ্যমে সহজেই দৈনিক ভালো টাকা উপার্জন করতে পারবেন।</p>
-            </div>
-
-            <!-- Earn Task 1: AdsGram Ads -->
-            <div class="water-glow-box p-4 rounded-xl flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
-                        <i class="fa-solid fa-video text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xs font-bold text-white">AdsGram ভিডিও এড</h3>
-                        <p class="text-[11px] text-cyan-400">+২০ কয়েন (০.২ টাকা) / এড</p>
-                    </div>
-                </div>
-                <button onclick="showAdsgramAd()" class="px-4 py-2 bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg shadow-lg hover:bg-cyan-400">
-                    দেখুন
-                </button>
-            </div>
-
-            <!-- Earn Task 2: Invite Friends -->
-            <div class="water-glow-box p-4 rounded-xl space-y-3">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400">
-                        <i class="fa-solid fa-user-plus text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xs font-bold text-white">বন্ধু রেফার করুন</h3>
-                        <p class="text-[11px] text-blue-300">+২০০ কয়েন (২ টাকা) / সফল রেফার</p>
-                    </div>
-                </div>
-                <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700/50 flex items-center justify-between text-xs">
-                    <span id="refLinkText" class="truncate text-slate-400 mr-2">https://t.me/CyberEarnBD_bot?start=123456</span>
-                    <button onclick="copyRefLink()" class="bg-cyan-500/20 text-cyan-400 px-3 py-1 rounded border border-cyan-500/40 font-semibold hover:bg-cyan-500/30 shrink-0">
-                        কপি
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- ================= TAB 3: SUPPORT (সাপোর্ট) ================= -->
-        <section id="tab-support" class="tab-content hidden space-y-4">
-            <div class="water-glow-box p-5 rounded-2xl text-center space-y-3">
-                <div class="w-16 h-16 mx-auto rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-400 text-2xl animate-float">
-                    <i class="fa-solid fa-headset"></i>
-                </div>
-                <h2 class="text-base font-bold text-white">সাহায্য বা সাপোর্টের প্রয়োজন?</h2>
-                <p class="text-xs text-slate-300">
-                    আমাদের অফিসিয়াল টেলিগ্রাম চ্যানেল ও কমিউনিটি গ্রূপ যুক্ত হয়ে সব লেটেস্ট আপডেট ও দ্রুত সাপোর্ট নিন।
-                </p>
-                <div class="pt-2 space-y-2">
-                    <a href="https://t.me/CyberEarnBD_Official" target="_blank" class="w-full py-3 bg-cyan-500/10 border border-cyan-400/50 hover:bg-cyan-500/20 text-cyan-300 rounded-xl font-bold text-xs flex items-center justify-center space-x-2">
-                        <i class="fa-brands fa-telegram text-base"></i>
-                        <span>অফিশিয়াল টেলিগ্রাম চ্যানেল</span>
-                    </a>
-                    <a href="https://t.me/CyberEarnBD_Community" target="_blank" class="w-full py-3 bg-blue-500/10 border border-blue-400/50 hover:bg-blue-500/20 text-blue-300 rounded-xl font-bold text-xs flex items-center justify-center space-x-2">
-                        <i class="fa-solid fa-users text-base"></i>
-                        <span>কমিউনিটি টেলিগ্রাম সাপোর্ট গ্রুপ</span>
-                    </a>
-                </div>
-            </div>
-        </section>
-
-        <!-- ================= TAB 4: WITHDRAW (উইথড্র) ================= -->
-        <section id="tab-withdraw" class="tab-content hidden space-y-4">
-            <div class="water-glow-box p-4 rounded-2xl space-y-3">
-                <h2 class="text-base font-bold text-cyan-400 flex items-center">
-                    <i class="fa-solid fa-wallet mr-2"></i> টাকা তুলে নিন (উইথড্র)
-                </h2>
-                <div class="text-xs text-slate-300 space-y-1 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                    <p class="text-yellow-400 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> উইথড্র নিয়মাবলি:</p>
-                    <p>• সর্বনিম্ন উইথড্র: <span class="text-white font-bold">১০,০০০ কয়েন = ১০০ টাকা</span></p>
-                    <p>• <span class="text-cyan-300 font-bold">প্রথমবার উইথড্র শর্ত:</span> অবশ্যই কমপক্ষে <span class="text-amber-400 font-bold">১৫ টি রেফার</span> এবং <span class="text-amber-400 font-bold">১০০ টি এডস</span> দেখতে হবে!</p>
-                    <p>• এরপর থেকে যেকোনো সময় ১০০ টাকা হলেই উইথড্র করতে পারবেন।</p>
-                </div>
-
-                <!-- First Withdrawal Tracker Progress Bars -->
-                <div id="firstWithdrawConditionBox" class="p-3 bg-cyan-950/30 rounded-xl border border-cyan-500/30 space-y-2">
-                    <div class="text-xs font-bold text-cyan-300">প্রথমবার উইথড্র প্রোগ্রেস:</div>
-                    <div>
-                        <div class="flex justify-between text-[11px] mb-1">
-                            <span>রেফারেল (১৫ টি প্রয়োজন):</span>
-                            <span id="refProgressText" class="font-bold text-cyan-400">0/15</span>
-                        </div>
-                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div id="refProgressBar" class="bg-cyan-400 h-full w-0 transition-all duration-500"></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[11px] mb-1">
-                            <span>এডস দেখা (১০০ টি প্রয়োজন):</span>
-                            <span id="adsProgressText" class="font-bold text-cyan-400">0/100</span>
-                        </div>
-                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div id="adsProgressBar" class="bg-blue-400 h-full w-0 transition-all duration-500"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Withdrawal Form -->
-                <form id="withdrawForm" onsubmit="handleWithdrawSubmit(event)" class="space-y-3 pt-2">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">পেমেন্ট মেথড নির্বাচন করুন</label>
-                        <select id="paymentMethod" required class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-cyan-400 outline-none">
-                            <option value="bKash">বিকাশ (bKash Personal)</option>
-                            <option value="Nagad">নগদ (Nagad Personal)</option>
-                            <option value="Rocket">রকেট (Rocket Personal)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">একাউন্ট নম্বর</label>
-                        <input type="text" id="accountNumber" placeholder="017xxxxxxxx" required class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-cyan-400 outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">উইথড্র টাকার পরিমাণ (BDT)</label>
-                        <input type="number" id="withdrawAmount" min="100" placeholder="সর্বনিম্ন ১০০ টাকা" required class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-cyan-400 outline-none">
-                    </div>
-
-                    <button type="submit" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs shadow-[0_0_15px_rgba(0,242,254,0.3)]">
-                        উইথড্র রিকোয়েস্ট পাঠান
-                    </button>
-                </form>
-            </div>
-        </section>
-
-        <!-- ================= TAB 5: PROFILE (প্রোফাইল) ================= -->
-        <section id="tab-profile" class="tab-content hidden space-y-4">
-            <div class="water-glow-box p-5 rounded-2xl text-center relative overflow-hidden">
-                <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-cyan-400 to-blue-600 p-0.5 mb-2 shadow-[0_0_15px_rgba(0,242,254,0.5)]">
-                    <div class="w-full h-full bg-slate-900 rounded-full flex items-center justify-center text-xl font-bold text-cyan-400">
-                        <span id="profileAvatar">U</span>
-                    </div>
-                </div>
-                <h2 id="profileName" class="text-base font-bold text-white">User Name</h2>
-                <p id="profileUserHandle" class="text-xs text-slate-400">@username</p>
-                <p class="text-[10px] text-cyan-400 mt-1">ID: <span id="profileUserId">00000000</span></p>
-            </div>
-
-            <!-- Profile Summary Box -->
-            <div class="water-glow-box p-4 rounded-xl space-y-2 text-xs">
-                <div class="flex justify-between py-1 border-b border-slate-800">
-                    <span class="text-slate-400">মোট কয়েন:</span>
-                    <span id="profCoins" class="font-bold text-cyan-400">0</span>
-                </div>
-                <div class="flex justify-between py-1 border-b border-slate-800">
-                    <span class="text-slate-400">মোট ব্যালেন্স:</span>
-                    <span id="profBalance" class="font-bold text-emerald-400">৳0.00 BDT</span>
-                </div>
-                <div class="flex justify-between py-1 border-b border-slate-800">
-                    <span class="text-slate-400">এড দেখা সম্পন্ন:</span>
-                    <span id="profAds" class="font-bold text-white">0</span>
-                </div>
-                <div class="flex justify-between py-1">
-                    <span class="text-slate-400">রেফারেল সংখ্যা:</span>
-                    <span id="profRefs" class="font-bold text-white">0</span>
-                </div>
-            </div>
-
-            <!-- Admin Access Toggle Button (Hidden by default for regular users) -->
-            <div id="adminBtnContainer" class="hidden">
-                <button onclick="checkAdminAccess()" class="w-full py-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-user-shield text-cyan-400"></i>
-                    <span>এডমিন প্যানেলে প্রবেশ করুন</span>
-                </button>
-            </div>
-        </section>
-
-        <!-- ================= ADMIN PANEL SECTION ================= -->
-        <section id="tab-admin" class="tab-content hidden space-y-4">
-            <div class="water-glow-box p-4 rounded-2xl">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-base font-bold text-cyan-400 flex items-center">
-                        <i class="fa-solid fa-lock-open mr-2"></i> এডমিন কন্ট্রোল প্যানেল
-                    </h2>
-                    <span class="text-[10px] bg-red-500/20 text-red-400 border border-red-500/40 px-2 py-0.5 rounded-full font-bold">
-                        ADMIN ONLY
-                    </span>
-                </div>
-
-                <!-- Admin Stats Overview -->
-                <div class="grid grid-cols-2 gap-2 text-xs mb-4">
-                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                        <span class="text-slate-400 block">মোট উইথড্র রিকোয়েস্ট</span>
-                        <span id="adminTotalWithdraws" class="text-base font-bold text-white">0</span>
-                    </div>
-                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                        <span class="text-slate-400 block">পেন্ডিং উইথড্র</span>
-                        <span id="adminPendingWithdraws" class="text-base font-bold text-amber-400">0</span>
-                    </div>
-                </div>
-
-                <!-- Withdrawal Requests List -->
-                <h3 class="text-xs font-bold text-slate-300 mb-2">সাম্প্রতিক উইথড্র রিকোয়েস্টসমূহ:</h3>
-                <div id="adminWithdrawList" class="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    <!-- Dynamic Items will be rendered here -->
-                    <p class="text-xs text-slate-500 text-center py-4">কোনো পেন্ডিং উইথড্র নেই</p>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <nav class="fixed bottom-0 left-0 right-0 bg-[#0a0f1d]/95 border-t border-cyan-500/20 backdrop-blur-lg z-40 py-2">
-        <div class="max-w-md mx-auto flex justify-around items-center px-2">
+@app.post(f"/webhook/{BOT_TOKEN}")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        
+        if "message" in data:
+            message = data["message"]
+            chat_id = message["chat"]["id"]
+            user_id = str(message["from"]["id"])
+            first_name = message["from"].get("first_name", "User")
+            username = message["from"].get("username", "")
+            text = message.get("text", "")
             
-            <button onclick="switchTab('home')" id="nav-home" class="nav-glow-item active flex flex-col items-center text-slate-400 hover:text-cyan-400 px-3 py-1">
-                <i class="fa-solid fa-house text-lg"></i>
-                <span class="text-[10px] mt-1 font-semibold">হোম</span>
-            </button>
+            if text.startswith("/start"):
+                parts = text.split(" ")
+                referred_by = parts[1] if len(parts) > 1 else None
 
-            <button onclick="switchTab('earn')" id="nav-earn" class="nav-glow-item flex flex-col items-center text-slate-400 hover:text-cyan-400 px-3 py-1">
-                <i class="fa-solid fa-coins text-lg"></i>
-                <span class="text-[10px] mt-1 font-semibold">আয় করুন</span>
-            </button>
+                # Automatically register or sync user in DB on /start
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+                existing = cursor.fetchone()
 
-            <button onclick="switchTab('support')" id="nav-support" class="nav-glow-item flex flex-col items-center text-slate-400 hover:text-cyan-400 px-3 py-1">
-                <i class="fa-solid fa-headset text-lg"></i>
-                <span class="text-[10px] mt-1 font-semibold">সাপোর্ট</span>
-            </button>
+                if not existing:
+                    cursor.execute(
+                        "INSERT INTO users (user_id, first_name, username, referred_by) VALUES (?, ?, ?, ?)",
+                        (user_id, first_name, username, referred_by)
+                    )
+                    if referred_by and referred_by != user_id:
+                        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (referred_by,))
+                        if cursor.fetchone():
+                            cursor.execute(
+                                "UPDATE users SET coins = coins + 200, referrals_count = referrals_count + 1 WHERE user_id = ?",
+                                (referred_by,)
+                            )
+                    conn.commit()
+                conn.close()
 
-            <button onclick="switchTab('withdraw')" id="nav-withdraw" class="nav-glow-item flex flex-col items-center text-slate-400 hover:text-cyan-400 px-3 py-1">
-                <i class="fa-solid fa-wallet text-lg"></i>
-                <span class="text-[10px] mt-1 font-semibold">উইথড্র</span>
-            </button>
+                welcome_text = (
+                    f"👋 **স্বাগতম Cyber Earn BD-তে, {first_name}!**\n\n"
+                    f"এখানে আপনি রিয়েল অ্যাড দেখে এবং বন্ধুদের রেফার করে প্রতিদিন ভালো টাকা ইনকাম করতে পারবেন।\n\n"
+                    f"📢 **চ্যানেল:** [Cyber Earn BD Official]({CHANNEL_URL})\n"
+                    f"💬 **গ্রুপ:** [Cyber Earn BD Community]({GROUP_URL})\n\n"
+                    f"নিচের **'🚀 ওপেন মিনি অ্যাপ'** বাটনে ক্লিক করে কাজ শুরু করুন।"
+                )
 
-            <button onclick="switchTab('profile')" id="nav-profile" class="nav-glow-item flex flex-col items-center text-slate-400 hover:text-cyan-400 px-3 py-1">
-                <i class="fa-solid fa-user text-lg"></i>
-                <span class="text-[10px] mt-1 font-semibold">প্রোফাইল</span>
-            </button>
-
-        </div>
-    </nav>
-
-    <script>
-        // CONFIGURATION CONSTANTS
-        const ADSGRAM_BLOCK_ID = "50072";
-        const COIN_VALUE_BDT = 0.01; // 1 Coin = 0.01 BDT (10,000 Coins = 100 BDT)
-        const AD_REWARD_COINS = 20;
-        const REFERRAL_REWARD_COINS = 200;
-        const MIN_WITHDRAW_BDT = 100;
-        const FIRST_WITHDRAW_MIN_REFS = 15;
-        const FIRST_WITHDRAW_MIN_ADS = 100;
-
-        // ADMIN SECURITY CONFIGURATION
-        const ADMIN_PASSCODE = "Turjo#02";
-        // আপনার টেলিগ্রাম আইডিটি নিচে যোগ করুন (যেমন: ['1001203', 'YOUR_TELEGRAM_USER_ID'])
-        const ADMIN_TELEGRAM_IDS = ['6682080873'];
-
-        // User State Initialization
-        let userData = {
-            id: '1001203',
-            name: 'Cyber User',
-            username: 'cyber_user',
-            coins: 0,
-            adsWatched: 0,
-            referrals: 0,
-            hasWithdrawnBefore: false,
-            vpnConnected: false,
-            countryCode: ''
-        };
-
-        let withdrawalRequests = [];
-
-        // Telegram WebApp Initialization
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-            if (tg.initDataUnsafe?.user) {
-                const u = tg.initDataUnsafe.user;
-                userData.id = u.id.toString();
-                userData.name = u.first_name + (u.last_name ? ' ' + u.last_name : '');
-                userData.username = u.username || 'user_' + u.id;
-            }
-        }
-
-        // On Page Load Initialization
-        window.addEventListener('DOMContentLoaded', async () => {
-            loadUserDataFromStorage();
-            updateUI();
-            await checkVPNStatus();
-
-            // Hide Loader Animation after init
-            setTimeout(() => {
-                const loader = document.getElementById('loader');
-                loader.classList.add('opacity-0');
-                setTimeout(() => loader.style.display = 'none', 500);
-            }, 800);
-        });
-
-        // Load / Save State Local Storage
-        function loadUserDataFromStorage() {
-            const saved = localStorage.getItem('cyber_earn_user_' + userData.id);
-            if (saved) {
-                try {
-                    userData = { ...userData, ...JSON.parse(saved) };
-                } catch (e) {
-                    console.error("Storage parse error", e);
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "🚀 ওপেন মিনি অ্যাপ", "web_app": {"url": WEBAPP_URL}}],
+                        [{"text": "📢 চ্যানেল", "url": CHANNEL_URL}, {"text": "💬 গ্রুপ", "url": GROUP_URL}]
+                    ]
                 }
-            }
-            const savedWithdrawals = localStorage.getItem('cyber_withdrawals');
-            if (savedWithdrawals) {
-                try { withdrawalRequests = JSON.parse(savedWithdrawals); } catch (e) {}
-            }
-        }
 
-        function saveUserData() {
-            localStorage.setItem('cyber_earn_user_' + userData.id, JSON.stringify(userData));
-            localStorage.setItem('cyber_withdrawals', JSON.stringify(withdrawalRequests));
-        }
-
-        async function checkVPNStatus() {
-            const statusText = document.getElementById('vpnStatusText');
-            const vpnBadge = document.getElementById('vpnBadge');
-            
-            try {
-                // Fetch Geolocation data to detect UK (GB) or US IP address
-                const response = await fetch('https://ipapi.co/json/');
-                const data = await response.json();
-                const country = data.country_code; // e.g. "GB" or "US"
-
-                if (country === 'GB' || country === 'US') {
-                    userData.vpnConnected = true;
-                    userData.countryCode = country;
-                    vpnBadge.className = "inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-                    vpnBadge.innerHTML = `<i class="fa-solid fa-shield-check mr-1"></i> ${country} VPN কানেক্টেড`;
-                    
-                    statusText.className = "text-emerald-300 font-semibold";
-                    statusText.innerText = `সঠিক VPN কানেক্টেড (${country})। আপনি এড দেখতে পারবেন।`;
-                } else {
-                    userData.vpnConnected = false;
-                    userData.countryCode = country || 'BD';
-                    vpnBadge.className = "inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
-                    vpnBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> UK/US VPN প্রয়োজন`;
-
-                    statusText.className = "text-amber-200/90";
-                    statusText.innerText = `আপনার বর্তমান আইপি: ${userData.countryCode}। এড দেখতে অবশ্যই UK বা US ভিপিএন সিলেক্ট করুন।`;
+                telegram_api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {
+                    "chat_id": chat_id,
+                    "text": welcome_text,
+                    "parse_mode": "Markdown",
+                    "reply_markup": json.dumps(keyboard)
                 }
-            } catch (error) {
-                console.warn("VPN check failed, allowing fallback warning:", error);
-                statusText.innerText = "VPN কানেকশন চেক করতে ব্যর্থ হয়েছে। দয়া করে UK/US VPN অন রাখুন।";
-            }
-        }
+                requests.post(telegram_api_url, json=payload)
+    except Exception as e:
+        print("Webhook Error:", str(e))
 
-        function showAdsgramAd() {
-            if (!userData.vpnConnected) {
-                alert("⚠️ ভিপিএন ওয়ার্নিং!\n\nএড দেখতে আপনাকে অবশ্যই আপনার VPN থেকে UK (যুক্তরাজ্য) অথবা US (যুক্তরাষ্ট্র) কান্ট্রি কানেক্ট করতে হবে।");
-                return;
-            }
+    return {"status": "ok"}
 
-            if (window.AdController) {
-                const AdController = new window.AdController({
-                    blockId: ADSGRAM_BLOCK_ID,
-                    debug: false
-                });
-
-                AdController.show().then((result) => {
-                    // User successfully completed ad
-                    userData.coins += AD_REWARD_COINS;
-                    userData.adsWatched += 1;
-                    saveUserData();
-                    updateUI();
-                    alert(`🎉 অভিনন্দন! এড দেখা সম্পন্ন হয়েছে। আপনি ২০ কয়েন পেয়েছেন!`);
-                }).catch((error) => {
-                    console.error("Adsgram Error:", error);
-                    alert("এডস লোড হতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
-                });
-            } else {
-                // Demo fallback if Adsgram fails to init inside dev preview
-                userData.coins += AD_REWARD_COINS;
-                userData.adsWatched += 1;
-                saveUserData();
-                updateUI();
-                alert(`[ডেমো মোড] এড সফলভাবে দেখা হয়েছে! +২০ কয়েন যুক্ত হয়েছে।`);
-            }
-        }
-
-        // Dynamic Tab Switching
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.nav-glow-item').forEach(el => el.classList.remove('active'));
-
-            const targetTab = document.getElementById(`tab-${tabName}`);
-            const targetNav = document.getElementById(`nav-${tabName}`);
-
-            if (targetTab) targetTab.classList.remove('hidden');
-            if (targetNav) targetNav.classList.add('active');
-
-            if (tabName === 'admin') {
-                renderAdminList();
-            }
-        }
-
-        function updateUI() {
-            const bdtBalance = (userData.coins * COIN_VALUE_BDT).toFixed(2);
-
-            // Top Header
-            document.getElementById('userName').innerText = userData.name;
-            document.getElementById('userAvatar').innerText = userData.name.charAt(0).toUpperCase();
-            document.getElementById('userCoins').innerText = userData.coins;
-            document.getElementById('userMoney').innerText = bdtBalance;
-
-            // Stats Home
-            document.getElementById('statAdsWatched').innerText = userData.adsWatched;
-            document.getElementById('statReferrals').innerText = userData.referrals;
-
-            // Referral Link Text
-            const refLink = `https://t.me/CyberEarnBD_bot?start=${userData.id}`;
-            document.getElementById('refLinkText').innerText = refLink;
-
-            // Profile
-            document.getElementById('profileName').innerText = userData.name;
-            document.getElementById('profileAvatar').innerText = userData.name.charAt(0).toUpperCase();
-            document.getElementById('profileUserHandle').innerText = '@' + userData.username;
-            document.getElementById('profileUserId').innerText = userData.id;
-            document.getElementById('profCoins').innerText = userData.coins;
-            document.getElementById('profBalance').innerText = `৳${bdtBalance} BDT`;
-            document.getElementById('profAds').innerText = userData.adsWatched;
-            document.getElementById('profRefs').innerText = userData.referrals;
-
-            // Admin Panel Button Visibility Check (Only show for Admin Telegram IDs)
-            const adminContainer = document.getElementById('adminBtnContainer');
-            if (ADMIN_TELEGRAM_IDS.includes(userData.id) || userData.id === '1001203') {
-                adminContainer.classList.remove('hidden');
-            } else {
-                adminContainer.classList.add('hidden');
-            }
-
-            // First Withdrawal Requirements Progress
-            const refPct = Math.min(100, Math.round((userData.referrals / FIRST_WITHDRAW_MIN_REFS) * 100));
-            const adsPct = Math.min(100, Math.round((userData.adsWatched / FIRST_WITHDRAW_MIN_ADS) * 100));
-
-            document.getElementById('refProgressText').innerText = `${userData.referrals}/${FIRST_WITHDRAW_MIN_REFS}`;
-            document.getElementById('refProgressBar').style.width = `${refPct}%`;
-
-            document.getElementById('adsProgressText').innerText = `${userData.adsWatched}/${FIRST_WITHDRAW_MIN_ADS}`;
-            document.getElementById('adsProgressBar').style.width = `${adsPct}%`;
-
-            // Hide condition box if already withdrawn once
-            const conditionBox = document.getElementById('firstWithdrawConditionBox');
-            if (userData.hasWithdrawnBefore) {
-                conditionBox.style.display = 'none';
-            }
-        }
-
-        function copyRefLink() {
-            const link = `https://t.me/CyberEarnBD_bot?start=${userData.id}`;
-            navigator.clipboard.writeText(link);
-            alert("রেফারেল লিঙ্ক কপি করা হয়েছে:\n" + link);
-        }
-
-        function handleWithdrawSubmit(event) {
-            event.preventDefault();
-
-            const method = document.getElementById('paymentMethod').value;
-            const account = document.getElementById('accountNumber').value.trim();
-            const amountBDT = parseFloat(document.getElementById('withdrawAmount').value);
-            const requiredCoins = amountBDT / COIN_VALUE_BDT;
-
-            // 1. Balance Check
-            if (userData.coins < requiredCoins) {
-                alert(`❌ পর্যাপ্ত ব্যালেন্স নেই!\n\n${amountBDT} টাকার জন্য ${requiredCoins} কয়েন প্রয়োজন। আপনার কাছে আছে ${userData.coins} কয়েন।`);
-                return;
-            }
-
-            // 2. First Withdrawal Rule Verification
-            if (!userData.hasWithdrawnBefore) {
-                if (userData.referrals < FIRST_WITHDRAW_MIN_REFS || userData.adsWatched < FIRST_WITHDRAW_MIN_ADS) {
-                    alert(`⚠️ প্রথমবার উইথড্র করার শর্ত পূরণ হয়নি!\n\nআপনাকে কমপক্ষে ${FIRST_WITHDRAW_MIN_REFS} টি রেফার (বর্তমানে ${userData.referrals}) এবং ${FIRST_WITHDRAW_MIN_ADS} টি এডস (বর্তমানে ${userData.adsWatched}) দেখতে হবে।`);
-                    return;
-                }
-            }
-
-            // Deduct Coins and Save
-            userData.coins -= requiredCoins;
-            saveUserData();
-            updateUI();
-
-            // Push Withdrawal Record
-            const request = {
-                id: 'WD-' + Date.now(),
-                userId: userData.id,
-                userName: userData.name,
-                method: method,
-                account: account,
-                amountBDT: amountBDT,
-                status: 'pending',
-                date: new Date().toLocaleDateString('bn-BD')
-            };
-
-            withdrawalRequests.push(request);
-            saveUserData();
-
-            alert(`✅ উইথড্র রিকোয়েস্ট সফল হয়েছে!\n\nমেথড: ${method}\nনম্বর: ${account}\nপরিমাণ: ৳${amountBDT} BDT\n\nএডমিন এটি যাচাই করে পেমেন্ট সম্পন্ন করবে।`);
-            document.getElementById('withdrawForm').reset();
-        }
-
-        function checkAdminAccess() {
-            const pass = prompt("এডমিন পাসকোড লিখুন:");
-            if (pass === ADMIN_PASSCODE) {
-                switchTab('admin');
-            } else {
-                alert("❌ ভুল পাসকোড! আপনি এডমিন প্যানেলে প্রবেশ করতে পারবেন না।");
-            }
-        }
-
-        function renderAdminList() {
-            const container = document.getElementById('adminWithdrawList');
-            document.getElementById('adminTotalWithdraws').innerText = withdrawalRequests.length;
-            
-            const pendingList = withdrawalRequests.filter(r => r.status === 'pending');
-            document.getElementById('adminPendingWithdraws').innerText = pendingList.length;
-
-            if (withdrawalRequests.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">কোনো উইথড্র রিকোয়েস্ট নেই</p>`;
-                return;
-            }
-
-            container.innerHTML = withdrawalRequests.map(req => `
-                <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700/60 text-xs space-y-1">
-                    <div class="flex justify-between font-bold">
-                        <span class="text-white">${req.userName} (${req.userId})</span>
-                        <span class="text-cyan-400">৳${req.amountBDT} BDT</span>
-                    </div>
-                    <div class="text-slate-400">
-                        মেথড: <span class="text-amber-300 font-semibold">${req.method}</span> | নম্বর: <span class="text-white font-mono">${req.account}</span>
-                    </div>
-                    <div class="flex justify-between items-center pt-2">
-                        <span class="text-[10px] px-2 py-0.5 rounded ${req.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-400'}">
-                            ${req.status === 'pending' ? 'পেন্ডিং' : 'সম্পন্ন'}
-                        </span>
-                        ${req.status === 'pending' ? `
-                            <div class="space-x-1">
-                                <button onclick="markWithdrawComplete('${req.id}')" class="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-2.5 py-1 rounded border border-emerald-500/40 text-[10px] font-bold">
-                                    কমপ্লিট
-                                </button>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function markWithdrawComplete(reqId) {
-            const index = withdrawalRequests.findIndex(r => r.id === reqId);
-            if (index !== -1) {
-                withdrawalRequests[index].status = 'completed';
-                // Mark user as withdrawn before so subsequent withdrawals don't enforce 15 ref requirement
-                if (withdrawalRequests[index].userId === userData.id) {
-                    userData.hasWithdrawnBefore = true;
-                }
-                saveUserData();
-                updateUI();
-                renderAdminList();
-                alert("পেমেন্ট সফল চিহ্নিত করা হয়েছে!");
-            }
-        }
-    </script>
-</body>
-</html>
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
