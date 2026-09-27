@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Point BD</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --panel-bg: #161b22;
+            --primary-color: #00f0ff;
+            --glow-color: rgba(0, 240, 255, 0.6);
+            --text-color: #ffffff;
+            --text-muted: #8b949e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Loading Screen */
+        #loader { position: fixed; inset: 0; background: var(--bg-color); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.5s ease; }
+        .spinner { width: 50px; height: 50px; border: 4px solid rgba(0,240,255,0.2); border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; box-shadow: 0 0 15px var(--glow-color); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* App Container */
+        .app-container { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 90px; }
+        .page { display: none; animation: fadeIn 0.4s ease-in-out; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Card with Water Glow */
+        .card { background: var(--panel-bg); border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,240,255,0.05); border: 1px solid rgba(0,240,255,0.2); }
+        .glow-btn { background: linear-gradient(135deg, #00f0ff, #0077ff); color: #000; font-weight: bold; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; width: 100%; box-shadow: 0 0 15px var(--glow-color); transition: 0.3s; }
+        .glow-btn:hover { box-shadow: 0 0 25px var(--primary-color); transform: scale(1.02); }
+
+        /* Navigation Bar (Bottom) */
+        .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #11161d; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid rgba(0,240,255,0.2); box-shadow: 0 -5px 20px rgba(0,0,0,0.8); z-index: 1000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); cursor: pointer; font-size: 11px; transition: 0.3s; }
+        .nav-item.active { color: var(--primary-color); text-shadow: 0 0 10px var(--glow-color); }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 3px; fill: currentColor; }
+
+        /* Form Inputs */
+        input, select { width: 100%; padding: 12px; margin: 10px 0; background: #0d1117; border: 1px solid rgba(0,240,255,0.3); border-radius: 8px; color: #fff; outline: none; }
+        input:focus { border-color: var(--primary-color); box-shadow: 0 0 8px var(--glow-color); }
+        
+        h2 { margin-bottom: 15px; font-size: 20px; color: var(--primary-color); text-shadow: 0 0 8px var(--glow-color); }
+        p, li { font-size: 14px; line-height: 1.6; color: var(--text-muted); margin-bottom: 10px; }
+        ul { padding-left: 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; color: var(--primary-color); text-shadow: 0 0 10px var(--glow-color);">লোড হচ্ছে...</p>
+    </div>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- হোম পেজ -->
+        <div id="page-home" class="page active">
+            <div class="card" style="text-align: center;">
+                <h2>স্বাগতম, <span id="user-name">ইউজার</span>!</h2>
+                <p>Cyber Point BD-তে আপনাকে স্বাগতম। নিচে আপনার একাউন্ট স্ট্যাটাস দেওয়া হলো:</p>
+                <div style="display: flex; justify-content: space-around; margin: 15px 0;">
+                    <div><h3><span id="lbl-coins">0</span></h3><p>কয়েন</p></div>
+                    <div><h3>৳<span id="lbl-balance">0.00</span></h3><p>ব্যালেন্স</p></div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>রেফার লিংক</h2>
+                <p>বন্ধুদের সাথে শেয়ার করে প্রতি রেఫারে ২০০ কয়েন পান!</p>
+                <input type="text" id="refer-link-home" readonly>
+                <button class="glow-btn" onclick="copyReferLink()">লিংক কপি করুন</button>
+            </div>
+        </div>
+
+        <!-- আয় করুন পেজ -->
+        <div id="page-earn" class="page">
+            <div class="card">
+                <h2>আয় করুন (AdsGram)</h2>
+                <p><strong>নিয়মাবলী:</strong></p>
+                <ul>
+                    <li>অবশ্যই UK বা US এর VPN কানেক্ট থাকতে হবে।</li>
+                    <li>VPN কানেক্ট না থাকলে এডস শো করবে না।</li>
+                    <li>প্রতিটি এড দেখার পর আপনার একাউন্টে ২০ কয়েন (২০ পয়সা) যোগ হবে।</li>
+                </ul>
+                <button class="glow-btn" style="margin-top: 15px;" onclick="showAd()">এডস দেখুন (Watch Ad)</button>
+            </div>
+            <div class="card">
+                <h2>আপনার রেফার লিংক</h2>
+                <input type="text" id="refer-link-earn" readonly>
+                <button class="glow-btn" onclick="copyReferLink()">শেয়ার বা কপি করুন</button>
+            </div>
+        </div>
+
+        <!-- সাপোর্ট পেজ -->
+        <div id="page-support" class="page">
+            <div class="card">
+                <h2>সাপোর্ট ও সাহায্য</h2>
+                <p><strong>নিয়মাবলী:</strong></p>
+                <ul>
+                    <li>আপনার যেকোনো সমস্যায় আমাদের সাপোর্ট গ্রুপে মেসেজ করতে পারেন।</li>
+                    <li>চ্যানেলে আমাদের সকল আপডেট দেওয়া হয়।</li>
+                </ul>
+                <button class="glow-btn" style="margin-top: 10px;" onclick="window.open('https://t.me/CyberPointBD_Official', '_blank')">টেলিগ্রাম চ্যানেল</button>
+                <button class="glow-btn" style="margin-top: 10px; background: linear-gradient(135deg, #00ff66, #00aa44);" onclick="window.open('https://t.me/CyberPointBD_Community', '_blank')">সাপোর্ট গ্রুপে মেসেজ করুন</button>
+            </div>
+        </div>
+
+        <!-- উইথড্র পেজ -->
+        <div id="page-withdraw" class="page">
+            <div class="card">
+                <h2>উইথড্র (টাকা তুলুন)</h2>
+                <p><strong>উইথড্র নিয়মাবলী:</strong></p>
+                <ul>
+                    <li>মিনিমাম উইথড্র ১০০ টাকা।</li>
+                    <li>প্রথমবার উইথড্র করার জন্য অন্তত ১৫টি রেফার এবং ১০০টি এড দেখা বাধ্যতামূলক।</li>
+                    <li>পরবর্তী সময়ে ১০০ টাকা হলেই সরাসরি বিকাশ, নগদ বা রকেটে পেমেন্ট নিতে পারবেন।</li>
+                </ul>
+                <select id="w-method">
+                    <option value="Bkash">বিকাশ (bKash)</option>
+                    <option value="Nagad">নগদ (Nagad)</option>
+                    <option value="Rocket">রকেট (Rocket)</option>
+                </select>
+                <input type="text" id="w-number" placeholder="আপনার একাউন্ট নম্বর দিন">
+                <input type="number" id="w-amount" placeholder="টাকার পরিমাণ (মিনিমাম ১০০)">
+                <button class="glow-btn" onclick="requestWithdraw()">উইথড্র করুন</button>
+            </div>
+        </div>
+
+        <!-- প্রোফাইল পেজ -->
+        <div id="page-profile" class="page">
+            <div class="card">
+                <h2>প্রোফাইল তথ্য</h2>
+                <p>নাম: <span id="pro-name">-</span></p>
+                <p>ইউজার আইডি: <span id="pro-id">-</span></p>
+                <p>মোট এড দেখা হয়েছে: <span id="pro-ads">0</span> টি</p>
+                <p>মোট রেফার: <span id="pro-refs">0</span> টি</p>
+                <div id="admin-panel-btn-container" style="margin-top: 20px; display: none;">
+                    <button class="glow-btn" style="background: linear-gradient(135deg, #ff0055, #aa0033);" onclick="openAdminPanel()">এডমিন প্যানেল</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- এডমিন পেজ (লুকানো থাকবে, শুধু এডমিন দেখতে পাবে) -->
+        <div id="page-admin" class="page">
+            <div class="card">
+                <h2>এডমিন ড্যাশবোর্ড</h2>
+                <h3>উইথড্র রিকোয়েস্টসমূহ</h3>
+                <div id="admin-withdrawals-list" style="margin-top: 10px; font-size: 13px;">লোড হচ্ছে...</div>
+                <h3 style="margin-top: 20px;">ইউজার লিস্ট</h3>
+                <div id="admin-users-list" style="margin-top: 10px; font-size: 13px;">লোড হচ্ছে...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="nav-bar">
+        <div class="nav-item active" onclick="switchTab('home', this)">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            হোম
+        </div>
+        <div class="nav-item" onclick="switchTab('earn', this)">
+            <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            আয় করুন
+        </div>
+        <div class="nav-item" onclick="switchTab('support', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.01.97 4.31L1 23l6.69-.97C9 22.64 10.46 23 12 23c5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+            সাপোর্ট
+        </div>
+        <div class="nav-item" onclick="switchTab('withdraw', this)">
+            <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V8c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v3h-2V8H5v11h14v-1h2zM5 6h14V4H5v2z"/></svg>
+            উইথড্র
+        </div>
+        <div class="nav-item" onclick="switchTab('profile', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            প্রোফাইল
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://YOUR_RENDER_BACKEND_URL.onrender.com'; // এখানে আপনার রেন্ডার ব্যাকএন্ড লিংক বসাবেন
+        let userData = {};
+        const adController = window.Adsgram ? window.Adsgram.init({ blockId: "int-50215" }) : null;
+
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+
+        const tgUser = Telegram.WebApp.initDataUnsafe?.user || { id: '6682080873', first_name: 'Touhidul' };
+        const startParam = Telegram.WebApp.initDataUnsafe?.start_param || null;
+
+        async function initApp() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telegram_id: tgUser.id,
+                        name: tgUser.first_name,
+                        referred_by: startParam
+                    })
+                });
+                userData = await response.json();
+
+                if (userData.is_banned) {
+                    alert('আপনার একাউন্টটি ব্যান করা হয়েছে!');
+                    return;
+                }
+
+                document.getElementById('user-name').innerText = userData.name;
+                document.getElementById('lbl-coins').innerText = userData.coins;
+                document.getElementById('lbl-balance').innerText = userData.balance.toFixed(2);
+                
+                const refLink = `https://t.me/CyberPointBD_bot?start=${userData.telegram_id}`;
+                document.getElementById('refer-link-home').value = refLink;
+                document.getElementById('refer-link-earn').value = refLink;
+
+                document.getElementById('pro-name').innerText = userData.name;
+                document.getElementById('pro-id').innerText = userData.telegram_id;
+                document.getElementById('pro-ads').innerText = userData.ads_watched;
+                document.getElementById('pro-refs').innerText = userData.referrals_count;
+
+                if (userData.is_admin) {
+                    document.getElementById('admin-panel-btn-container').style.display = 'block';
+                }
+
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+            } catch (err) {
+                console.error(err);
+                alert('সার্ভার কানেকশন ত্রুটি!');
+            }
+        }
+
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${tabId}`).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            if (element) element.classList.add('active');
+        }
+
+        function copyReferLink() {
+            const linkInput = document.getElementById('refer-link-home');
+            linkInput.select();
+            navigator.clipboard.writeText(linkInput.value);
+            alert('রেফার লিংক কপি করা হয়েছে!');
+        }
+
+        function showAd() {
+            // VPN Check simulation or Adsgram execution
+            if (adController) {
+                adController.show().then(() => {
+                    // Ad watched successfully, reward user
+                    fetch(`${BACKEND_URL}/api/watch-ad`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ telegram_id: tgUser.id })
+                    }).then(res => res.json()).then(data => {
+                        alert(data.message);
+                        initApp();
+                    });
+                }).catch((result) => {
+                    alert('এড দেখা সম্পন্ন হয়নি বা VPN (UK/US) কানেক্ট করা নেই!');
+                });
+            } else {
+                alert('এডস লোড হতে সমস্যা হচ্ছে। দয়া করে VPN (UK/US) কানেক্ট করে আবার চেষ্টা করুন।');
+            }
+        }
+
+        function requestWithdraw() {
+            const method = document.getElementById('w-method').value;
+            const number = document.getElementById('w-number').value;
+            const amount = document.getElementById('w-amount').value;
+
+            if (!number || !amount) {
+                alert('সকল ঘর পূরণ করুন!');
+                return;
+            }
+
+            fetch(`${BACKEND_URL}/api/withdraw`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: tgUser.id, method, number, amount })
+            }).then(res => res.json()).then(data => {
+                alert(data.message);
+                if(data.success) initApp();
+            });
+        }
+
+        function openAdminPanel() {
+            switchTab('admin');
+            fetch(`${BACKEND_URL}/api/admin/data?telegram_id=${tgUser.id}`)
+            .then(res => res.json())
+            .then(data => {
+                let wHtml = '';
+                data.withdrawals.forEach(w => {
+                    wHtml += `<div>ID: ${w[0]} | User: ${w[1]} | ৳${w[2]} | ${w[3]} (${w[4]}) | Status: ${w[5]} <button onclick="completeWithdraw(${w[0]})">Complete</button></div><hr>`;
+                });
+                document.getElementById('admin-withdrawals-list').innerHTML = wHtml || 'কোন রিকোয়েস্ট নেই';
+
+                let uHtml = '';
+                data.users.forEach(u => {
+                    uHtml += `<div>ID: ${u[0]} | Name: ${u[1]} | Coins: ${u[3]} | Ads: ${u[4]} | Refs: ${u[5]}</div><hr>`;
+                });
+                document.getElementById('admin-users-list').innerHTML = uHtml;
+            });
+        }
+
+        function completeWithdraw(id) {
+            fetch(`${BACKEND_URL}/api/admin/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: tgUser.id, type: 'complete_withdraw', id })
+            }).then(() => openAdminPanel());
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
